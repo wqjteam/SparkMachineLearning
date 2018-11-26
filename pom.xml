@@ -64,6 +64,14 @@
             <!--<scope>runtime</scope>-->
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/org.jblas/jblas -->
+        <!--  线代计算库 -->
+        <dependency>
+            <groupId>org.jblas</groupId>
+            <artifactId>jblas</artifactId>
+            <version>1.2.3</version>
+        </dependency>
+
 
         <dependency>
             <groupId>org.apache.hadoop</groupId>
