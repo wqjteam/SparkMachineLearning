@@ -4,20 +4,22 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.mllib.recommendation.{ALS, Rating}
 import org.apache.spark.sql.SparkSession
+import org.jblas.DoubleMatrix
 
 /**
   * @Auther: wqj
-  * @Date: 2018/11/26 17:01
+  * @Date: 2018/11/26 17:50
   * @Description:
   */
-object BaseAls {
+object SimilarityProduct {
+
   def main(args: Array[String]): Unit = {
 
 
     val conf = new Configuration
     val sparkConf = new SparkConf()
     sparkConf.setMaster("local[*]")
-    sparkConf.setAppName("BaseAls")
+    sparkConf.setAppName("SimilarityProduct")
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "true")
     sparkConf.set("spark.debug.maxToStringFields", "300")
     sparkConf.set("spark.streaming.stopGracefullyOnShutdown", "true")
@@ -28,6 +30,7 @@ object BaseAls {
       .config(sparkConf)
       //      .enableHiveSupport()
       .getOrCreate()
+
 
     //创建训练集
     //数据原型 196 242 3
@@ -45,15 +48,44 @@ object BaseAls {
     //- lambda：该参数控制正则化过程，其值越高，正则化程度就越深。一般设置为0.01
     // 启动ALS矩阵分解
     val model = ALS.train(ratings, 50, 10, 0.01)
-    model.userFeatures.count
+    //接下来获取物品(本例以物品567为例)的因子特征向量，并将它转换为jblas的矩阵格式
 
-    //用789预测123这个商品
-    val predictdRating = model.predict(789, 123)
+    // 选定id为567的电影
+    val itemId = 567
+    // 获取该物品的隐因子向量
+    val itemFactor = model.productFeatures.lookup(itemId).head
+    // 将该向量转换为jblas矩阵类型
+    val itemVector = new DoubleMatrix(itemFactor)
 
-    //对789 推荐前10个商品
-    val userId = 789
+
+    //计算物品567和所有其他物品的相似度：
+    // 计算电影567与其他电影的相似度
+    val sims = model.productFeatures.map { case (id, factor) =>
+      val factorVector = new DoubleMatrix(factor)
+      val sim = cosineSimilarity(factorVector, itemVector)
+      (id, sim)
+    }
+
     val K = 10
-    val topKRecs = model.recommendProducts(userId, K)
-    println(topKRecs.mkString("\n"))
+    // 获取与电影567最相似的10部电影
+    val sortedSims = sims.top(K)(Ordering.by[(Int, Double), Double] { case (id, similarity) => similarity })
+    // 打印结果
+    println(sortedSims.mkString("\n"))
+
+    //查看结果
+    // 打印电影567的影片名
+    //    println(titles(567))
+    // 获取和电影567最相似的11部电影(含567自己)
+    val sortedSims2 = sims.top(K + 1)(Ordering.by[(Int, Double), Double] { case (id, similarity) => similarity })
+    // 再打印和电影567最相似的10部电影
+    //    sortedSims2.slice(1, 11).map { case (id, sim) => (titles(id), sim) }.mkString("\n")
+
+
+  }
+
+
+  // 定义相似度函数
+  def cosineSimilarity(vec1: DoubleMatrix, vec2: DoubleMatrix): Double = {
+    vec1.dot(vec2) / (vec1.norm2() * vec2.norm2())
   }
 }
