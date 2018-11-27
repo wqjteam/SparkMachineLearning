@@ -14,7 +14,6 @@ object BaseAls {
   def main(args: Array[String]): Unit = {
 
 
-    val conf = new Configuration
     val sparkConf = new SparkConf()
     sparkConf.setMaster("local[*]")
     sparkConf.setAppName("BaseAls")
